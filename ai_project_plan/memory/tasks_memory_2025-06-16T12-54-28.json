@@ -1,0 +1,128 @@
+{
+  "tasks": [
+    {
+      "id": "d389e1cf-d629-455a-ba2b-979665c6c3d1",
+      "name": "Restructure Project Directories",
+      "description": "Create the new 'src/app' directory and move all existing source code folders ('api', 'config', 'core', 'dataset', 'prompt', 'services', 'utils') into it. Rename 'src/main.py' to 'src/app/main.py'. This sets the foundation for the new project structure.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-16T10:45:53.951Z",
+      "updatedAt": "2025-06-16T10:49:22.901Z",
+      "relatedFiles": [
+        {
+          "path": "src/",
+          "type": "TO_MODIFY",
+          "description": "The main source directory to be restructured."
+        }
+      ],
+      "implementationGuide": "Use shell commands to create the 'src/app' directory and move the other directories into it. Then, rename 'src/main.py'. Ensure all '__init__.py' files are kept or created where necessary.",
+      "verificationCriteria": "The 'src/app' directory must exist and contain all the source code directories. 'src/main.py' should no longer exist, and 'src/app/main.py' should exist.",
+      "analysisResult": "The overall goal is to refactor the FastAPI application to follow modern best practices. This involves restructuring the project to use an app factory pattern, which enhances scalability and modularity. It also involves implementing a robust, environment-aware configuration system using Pydantic for validation and loading settings from `.env` files or a secret manager. This will make the application more secure, easier to configure for different environments (local, dev, prod), and more resilient to configuration errors. All file paths will be updated to reflect the new `src/app` structure, and scripts and documentation will be aligned with the new startup procedure.",
+      "summary": "The project directories have been successfully restructured. The src/app directory exists and contains all the required folders (api, config, core, dataset, prompt, services, utils), and there's a main.py file in src/app. No further action was needed as the structure was already in place.",
+      "completedAt": "2025-06-16T10:49:22.901Z"
+    },
+    {
+      "id": "8ca029d7-3129-49a1-8443-544ea5298d2e",
+      "name": "Implement Core Configuration Logic",
+      "description": "Create the core logic for environment variable management. This includes creating 'src/app/core/config.py' to define Pydantic settings models for application configuration and secrets, and 'src/app/core/init.py' to create the 'init_config' function that loads and validates these settings based on the environment.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d389e1cf-d629-455a-ba2b-979665c6c3d1"
+        }
+      ],
+      "createdAt": "2025-06-16T10:45:53.951Z",
+      "updatedAt": "2025-06-16T10:53:06.538Z",
+      "relatedFiles": [
+        {
+          "path": "src/app/core/config.py",
+          "type": "CREATE",
+          "description": "Pydantic settings models."
+        },
+        {
+          "path": "src/app/core/init.py",
+          "type": "CREATE",
+          "description": "Configuration initializer function."
+        },
+        {
+          "path": ".env.local",
+          "type": "CREATE",
+          "description": "Example env file for local development."
+        }
+      ],
+      "implementationGuide": "In 'config.py', define a 'Settings' class inheriting from Pydantic's 'BaseSettings' to load variables from an .env file. Define required variables. In 'init.py', create an 'init_config' async function that loads the settings and can be extended to fetch from a secret manager. Add '__init__.py' to 'src/app' and 'src/app/core'.",
+      "verificationCriteria": "The files 'src/app/core/config.py' and 'src/app/core/init.py' must be created with the specified logic. The 'init_config' function should correctly load variables and be ready for integration.",
+      "analysisResult": "The overall goal is to refactor the FastAPI application to follow modern best practices. This involves restructuring the project to use an app factory pattern, which enhances scalability and modularity. It also involves implementing a robust, environment-aware configuration system using Pydantic for validation and loading settings from `.env` files or a secret manager. This will make the application more secure, easier to configure for different environments (local, dev, prod), and more resilient to configuration errors. All file paths will be updated to reflect the new `src/app` structure, and scripts and documentation will be aligned with the new startup procedure.",
+      "summary": "Successfully implemented the core configuration logic by creating src/app/core/config.py with Pydantic settings models and src/app/core/init.py with the init_config function. The implementation includes environment-specific settings, logging setup, and a placeholder for loading secrets from a secret manager in production. Also updated .gitignore to exclude .env files.",
+      "completedAt": "2025-06-16T10:53:06.538Z"
+    },
+    {
+      "id": "4d5a47ef-9c7e-47c6-95b8-e2ad16ebf455",
+      "name": "Implement FastAPI App Factory",
+      "description": "Create the 'create_app' function in a new 'src/app/app.py' file. This function will be responsible for instantiating the FastAPI application, setting up lifespan events, exception handlers, and including the API routers from 'src/app/api/endpoints'.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "d389e1cf-d629-455a-ba2b-979665c6c3d1"
+        }
+      ],
+      "createdAt": "2025-06-16T10:45:53.951Z",
+      "updatedAt": "2025-06-16T10:55:32.264Z",
+      "relatedFiles": [
+        {
+          "path": "src/app/app.py",
+          "type": "CREATE",
+          "description": "Contains the FastAPI app factory."
+        },
+        {
+          "path": "src/app/api/endpoints/opos.py",
+          "type": "REFERENCE",
+          "description": "The router to be included."
+        }
+      ],
+      "implementationGuide": "Create 'src/app/app.py'. Define a 'create_app' function that returns a FastAPI instance. Inside it, set up a lifespan context manager. Import the 'opos' router from 'src/app/api/endpoints/opos.py' and include it in the app. Follow the structure from the user's example.",
+      "verificationCriteria": "The 'src/app/app.py' file must exist and contain a valid 'create_app' function. The function must correctly initialize a FastAPI app and include the 'opos' router.",
+      "analysisResult": "The overall goal is to refactor the FastAPI application to follow modern best practices. This involves restructuring the project to use an app factory pattern, which enhances scalability and modularity. It also involves implementing a robust, environment-aware configuration system using Pydantic for validation and loading settings from `.env` files or a secret manager. This will make the application more secure, easier to configure for different environments (local, dev, prod), and more resilient to configuration errors. All file paths will be updated to reflect the new `src/app` structure, and scripts and documentation will be aligned with the new startup procedure.",
+      "summary": "Successfully implemented the FastAPI app factory by creating src/app/app.py with a create_app function. The implementation includes lifespan events for startup and shutdown, CORS middleware configuration, global exception handling, and router registration. The function properly includes the opos router and adds a root endpoint.",
+      "completedAt": "2025-06-16T10:55:32.264Z"
+    },
+    {
+      "id": "87641b2a-07d7-4acf-98fe-c8ec3128e08b",
+      "name": "Update Application Entrypoint and Scripts",
+      "description": "Update the main application entrypoint 'src/app/main.py' to use the new 'init_config' function and the 'create_app' factory. Also, update the 'scripts/run.sh' and 'README.md' to reflect the new project structure and startup command.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "8ca029d7-3129-49a1-8443-544ea5298d2e"
+        },
+        {
+          "taskId": "4d5a47ef-9c7e-47c6-95b8-e2ad16ebf455"
+        }
+      ],
+      "createdAt": "2025-06-16T10:45:53.951Z",
+      "updatedAt": "2025-06-16T10:58:53.968Z",
+      "relatedFiles": [
+        {
+          "path": "src/app/main.py",
+          "type": "TO_MODIFY",
+          "description": "The application entrypoint."
+        },
+        {
+          "path": "scripts/run.sh",
+          "type": "TO_MODIFY",
+          "description": "The application startup script."
+        },
+        {
+          "path": "README.md",
+          "type": "TO_MODIFY",
+          "description": "Project documentation."
+        }
+      ],
+      "implementationGuide": "In 'src/app/main.py', replace the existing code with a call to 'asyncio.run(init_config())' followed by 'uvicorn.run(\"app.app:create_app\", factory=True)'. Update 'scripts/run.sh' to execute 'poetry run python src/app/main.py'. Update 'README.md' with the new run command and a description of the new structure.",
+      "verificationCriteria": "'src/app/main.py' must be updated to use the app factory. 'scripts/run.sh' must execute the new main file. 'README.md' must contain up-to-date instructions.",
+      "analysisResult": "The overall goal is to refactor the FastAPI application to follow modern best practices. This involves restructuring the project to use an app factory pattern, which enhances scalability and modularity. It also involves implementing a robust, environment-aware configuration system using Pydantic for validation and loading settings from `.env` files or a secret manager. This will make the application more secure, easier to configure for different environments (local, dev, prod), and more resilient to configuration errors. All file paths will be updated to reflect the new `src/app` structure, and scripts and documentation will be aligned with the new startup procedure.",
+      "summary": "Successfully updated the application entrypoint and scripts. The main.py file now uses the init_config function and create_app factory, the run.sh script has been updated to execute the new main.py path, and the README.md has been enhanced with detailed information about the new project structure and startup commands.",
+      "completedAt": "2025-06-16T10:58:53.968Z"
+    }
+  ]
+}

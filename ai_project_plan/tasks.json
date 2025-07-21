@@ -1,0 +1,115 @@
+{
+  "tasks": [
+    {
+      "id": "9fa24ed7-0dd4-4851-829f-24d9a7f6977d",
+      "name": "Create PromptManager and Centralize Prompt Definitions",
+      "description": "Create a new file `app/core/prompt_manager.py` and define a `PromptManager` class within it. Move all prompt string constants (e.g., `PLANNER_SYSTEM_PROMPT_WITH_INFORMER`) and the few-shot example loading logic (`_load_few_shot_examples`) from `app/core/prompts.py` into this new class.",
+      "status": "completed",
+      "dependencies": [],
+      "createdAt": "2025-06-17T15:59:40.396Z",
+      "updatedAt": "2025-06-17T16:03:12.540Z",
+      "relatedFiles": [
+        {
+          "path": "app/core/prompt_manager.py",
+          "type": "CREATE",
+          "description": "The new centralized prompt management class will be created here."
+        },
+        {
+          "path": "app/core/prompts.py",
+          "type": "REFERENCE",
+          "description": "Source file for prompt content and logic to be moved."
+        }
+      ],
+      "implementationGuide": "1. Create the file `app/core/prompt_manager.py`. 2. Define the `PromptManager` class. 3. Copy all prompt string constants from `app/core/prompts.py` and define them as class attributes inside `PromptManager`. 4. Move the `_load_few_shot_examples` function from `app/core/prompts.py` and convert it into a method of `PromptManager`, adjusting file paths as necessary.",
+      "verificationCriteria": "The file `app/core/prompt_manager.py` is created and contains the `PromptManager` class. This class must contain all prompt string definitions and the few-shot example loading logic previously in `prompts.py`. The file must be free of syntax errors.",
+      "analysisResult": "The overall goal is to refactor the application's prompt management system to fix a critical bug and improve maintainability. This will be achieved by creating a centralized `PromptManager` class that handles all prompt-related logic. The bug, where the agent's `instruction` is never processed, will be fixed by adopting the standard `LangGraph` pattern of using a `MessagesPlaceholder` in the prompt template. This will allow the `planner_chain` to correctly consume the stateful message history. The final step involves cleaning up the old, scattered prompt code to complete the refactoring.",
+      "summary": "Successfully created app/core/prompt_manager.py with the PromptManager class that centralizes all prompt string constants and the few-shot example loading logic from prompts.py. The implementation includes all required prompt constants, the _load_few_shot_examples method, and utility methods for creating prompt templates.",
+      "completedAt": "2025-06-17T16:03:12.540Z"
+    },
+    {
+      "id": "ec90f2a1-d87c-402b-92c4-c6762fe2959b",
+      "name": "Implement Prompt Template Creation in PromptManager",
+      "description": "Implement methods within `PromptManager` to create and format prompt templates. This is the core of the bug fix, introducing `MessagesPlaceholder` to correctly handle conversational history. This task will also involve creating helper methods to format the initial user messages for the agents.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "9fa24ed7-0dd4-4851-829f-24d9a7f6977d"
+        }
+      ],
+      "createdAt": "2025-06-17T15:59:40.396Z",
+      "updatedAt": "2025-06-17T16:06:59.014Z",
+      "relatedFiles": [
+        {
+          "path": "app/core/prompt_manager.py",
+          "type": "TO_MODIFY",
+          "description": "The new methods for creating prompt templates will be added here."
+        },
+        {
+          "path": "app/core/prompts.py",
+          "type": "REFERENCE",
+          "description": "Reference for the logic of the original `create_prompt_template` function."
+        }
+      ],
+      "implementationGuide": "1. In `PromptManager`, implement `get_planner_prompt_template(self, with_informer: bool)`. This method must return a `ChatPromptTemplate` that includes a `SystemMessage` and `MessagesPlaceholder(variable_name=\"messages\")`. 2. Implement a similar `get_informer_prompt_template` method. 3. Implement `format_initial_user_message` and `format_informer_user_message` methods to encapsulate the string formatting logic for creating the initial `HumanMessage` for each agent.",
+      "verificationCriteria": "The `PromptManager` class must contain methods for creating planner and informer prompt templates using `MessagesPlaceholder`. It must also contain methods for formatting the initial user messages for the agents.",
+      "analysisResult": "The overall goal is to refactor the application's prompt management system to fix a critical bug and improve maintainability. This will be achieved by creating a centralized `PromptManager` class that handles all prompt-related logic. The bug, where the agent's `instruction` is never processed, will be fixed by adopting the standard `LangGraph` pattern of using a `MessagesPlaceholder` in the prompt template. This will allow the `planner_chain` to correctly consume the stateful message history. The final step involves cleaning up the old, scattered prompt code to complete the refactoring.",
+      "summary": "Successfully implemented the PromptManager class with methods to create prompt templates using MessagesPlaceholder and format initial user messages. Added get_planner_prompt_template and get_informer_prompt_template methods that use MessagesPlaceholder for proper conversational history handling, as well as format_initial_user_message and format_informer_user_message methods to handle the string formatting logic for creating initial messages.",
+      "completedAt": "2025-06-17T16:06:59.014Z"
+    },
+    {
+      "id": "530ad990-cb51-472d-9934-40fb2e18875a",
+      "name": "Refactor SheetAgentGraph to Use PromptManager",
+      "description": "Update `app/core/graph.py` to use the new `PromptManager`. This involves instantiating the manager, using it to create the prompt chains, and delegating the formatting of initial messages to it. This decouples the graph logic from the prompt content.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "ec90f2a1-d87c-402b-92c4-c6762fe2959b"
+        }
+      ],
+      "createdAt": "2025-06-17T15:59:40.396Z",
+      "updatedAt": "2025-06-17T16:12:35.614Z",
+      "relatedFiles": [
+        {
+          "path": "app/core/graph.py",
+          "type": "TO_MODIFY",
+          "description": "This file will be refactored to use the new PromptManager."
+        },
+        {
+          "path": "app/core/prompt_manager.py",
+          "type": "DEPENDENCY",
+          "description": "The PromptManager will be imported and used by the graph."
+        }
+      ],
+      "implementationGuide": "1. In `SheetAgentGraph.__init__`, instantiate `PromptManager`. 2. Replace the old prompt creation logic with calls to `prompt_manager.get_planner_prompt_template()` and `prompt_manager.get_informer_prompt_template()` to build the agent chains. 3. Update the `create_initial_state` function to accept the `prompt_manager` instance and use `prompt_manager.format_initial_user_message()` to generate the initial `HumanMessage`. 4. Update the `informer_node` to use `prompt_manager.format_informer_user_message()`. 5. Ensure the `SheetAgentGraph.run` method passes the `prompt_manager` instance into `create_initial_state`.",
+      "verificationCriteria": "`app/core/graph.py` must no longer import from `app.core.prompts` or contain any direct prompt creation logic. It must successfully instantiate and use `PromptManager` to set up the agent chains and initial messages. The agent execution flow must remain correct.",
+      "analysisResult": "The overall goal is to refactor the application's prompt management system to fix a critical bug and improve maintainability. This will be achieved by creating a centralized `PromptManager` class that handles all prompt-related logic. The bug, where the agent's `instruction` is never processed, will be fixed by adopting the standard `LangGraph` pattern of using a `MessagesPlaceholder` in the prompt template. This will allow the `planner_chain` to correctly consume the stateful message history. The final step involves cleaning up the old, scattered prompt code to complete the refactoring.",
+      "summary": "Successfully refactored SheetAgentGraph to use PromptManager, removing all direct imports from app.core.prompts. Added prompt_manager to GraphState, instantiated it in __init__, and used it for all prompt-related operations including formatting messages and creating prompt templates. The code now properly delegates all prompt management to the PromptManager class, improving maintainability and fixing the critical bug.",
+      "completedAt": "2025-06-17T16:12:35.613Z"
+    },
+    {
+      "id": "248d19b4-1714-4519-8a03-24a6eab41541",
+      "name": "Finalize Refactoring and Cleanup",
+      "description": "Complete the refactoring process by removing the old and now-redundant `app/core/prompts.py` file. This ensures that all prompt logic is sourced from the new `PromptManager` and prevents future maintenance issues.",
+      "status": "completed",
+      "dependencies": [
+        {
+          "taskId": "530ad990-cb51-472d-9934-40fb2e18875a"
+        }
+      ],
+      "createdAt": "2025-06-17T15:59:40.396Z",
+      "updatedAt": "2025-06-17T16:15:33.910Z",
+      "relatedFiles": [
+        {
+          "path": "app/core/prompts.py",
+          "type": "OTHER",
+          "description": "This file is now redundant and needs to be deleted as part of the cleanup."
+        }
+      ],
+      "implementationGuide": "1. Delete the file `app/core/prompts.py` from the project. 2. Perform a global search for any lingering imports from `app.core.prompts` and remove them to prevent import errors.",
+      "verificationCriteria": "The file `app/core/prompts.py` must be deleted from the filesystem. The application must compile and run without errors after the file's removal.",
+      "analysisResult": "The overall goal is to refactor the application's prompt management system to fix a critical bug and improve maintainability. This will be achieved by creating a centralized `PromptManager` class that handles all prompt-related logic. The bug, where the agent's `instruction` is never processed, will be fixed by adopting the standard `LangGraph` pattern of using a `MessagesPlaceholder` in the prompt template. This will allow the `planner_chain` to correctly consume the stateful message history. The final step involves cleaning up the old, scattered prompt code to complete the refactoring.",
+      "summary": "Successfully completed the refactoring process by removing the redundant app/core/prompts.py file. Verified that all prompt-related functionality has been properly migrated to the PromptManager class and that there are no remaining imports or references to app.core.prompts in the active codebase. This ensures that all prompt logic is now centralized in the PromptManager, preventing future maintenance issues.",
+      "completedAt": "2025-06-17T16:15:33.909Z"
+    }
+  ]
+}

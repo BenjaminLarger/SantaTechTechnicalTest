@@ -1,0 +1,19 @@
+{"round": 1, "planner": {"input_tokens": 3621, "output_tokens": 66, "total_tokens": 3687}}
+{"round": 2, "planner": {"input_tokens": 4111, "output_tokens": 354, "total_tokens": 4465}}
+{"round": 3, "planner": {"input_tokens": 5048, "output_tokens": 166, "total_tokens": 5214}}
+{"round": 4, "planner": {"input_tokens": 5869, "output_tokens": 166, "total_tokens": 6035}}
+{"round": 5, "planner": {"input_tokens": 6591, "output_tokens": 335, "total_tokens": 6926}}
+{"round": 6, "planner": {"input_tokens": 7386, "output_tokens": 107, "total_tokens": 7493}}
+{"round": 7, "planner": {"input_tokens": 7953, "output_tokens": 107, "total_tokens": 8060}}
+{"round": 8, "planner": {"input_tokens": 8520, "output_tokens": 485, "total_tokens": 9005}}
+{"round": 9, "planner": {"input_tokens": 9482, "output_tokens": 509, "total_tokens": 9991}}
+{"round": 10, "planner": {"input_tokens": 10468, "output_tokens": 142, "total_tokens": 10610}}
+
+Cumulative input tokens: 69049
+Cumulative output tokens: 2437
+dollar per input tokens: 2 / 1000_000
+dollar per output tokens: 8 / 1000_000
+
+input cost: 69049 * 2 / 1000_000 = 0.138098
+output cost: 2437 * 8 / 1000_000 = 0.019504
+total cost: 0.138098 + 0.019504 = 0.157602
