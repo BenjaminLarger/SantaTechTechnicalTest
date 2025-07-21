@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 load_dotenv()
 import os
 print("Loading environment variables from .env file")
-print(f"APP_ENVIRONMENT = {os.getenv('APP_ENVIRONMENT', 'not set')}")
 configure_logging(force=True)
 
 logger = logging.getLogger(__name__)
