@@ -19,6 +19,7 @@ from app.utils.enumeration import MODEL_TYPE
 from app.dataset.dataloader import SheetProblem
 from app.core.sandbox import Sandbox
 from app.graph.tools import python_executor, cell_range_reader
+from app.graph.opos_intelligence import get_all_intelligence_tools
 from app.core.prompt_manager import PromptManager
 from app.utils.utils import parse_think
 from app.graph.state import GraphState
@@ -215,8 +216,12 @@ class SheetAgentGraph:
             timeout=60
         )
         
-        # Create list of tools for binding
-        self.tool_list = [python_executor, cell_range_reader]
+        # Create list of tools for binding (enhanced with OPOS intelligence)
+        base_tools = [python_executor, cell_range_reader]
+        intelligence_tools = get_all_intelligence_tools()
+        self.tool_list = base_tools + intelligence_tools
+        
+        logger.info(f"Initialized SheetAgent with {len(self.tool_list)} tools: {[tool.name for tool in self.tool_list]}")
         
         # Bind tools to the planner model
         planner_model = planner_model.bind_tools(self.tool_list)
