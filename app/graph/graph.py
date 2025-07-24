@@ -24,6 +24,7 @@ from app.graph.nodes.opos_analyzer import opos_preprocessing_node, validation_no
 from app.core.prompt_manager import PromptManager
 from app.utils.utils import parse_think
 from app.graph.state import GraphState
+from langchain_core.runnables import RunnableConfig
 
 # Configure logger
 logger = logging.getLogger(__name__)
@@ -44,6 +45,17 @@ def planner_node(state: GraphState) -> GraphState:
     """
     logger.info(f"Executing planner node at step {state['step']}")
     
+    # Check for safety - prevent infinite loops
+    current_step = state.get("step", 0)
+    max_steps = state.get("max_steps", 15)
+    
+    if current_step >= max_steps:
+        logger.warning(f"Maximum steps ({max_steps}) reached, stopping execution")
+        return {
+            **state,
+            "step": current_step + 1  # Increment to trigger end condition
+        }
+    
     # Extract the necessary components from the state
     planner_chain = state["planner_chain"]
     messages = state["messages"]
@@ -53,40 +65,40 @@ def planner_node(state: GraphState) -> GraphState:
     if sheet_state_changed:
         observation = state["prompt_manager"].get_observation_prompt(state["current_sheet_state"])
         
-    # LLM CALL
-    response = planner_chain.invoke({
-        "messages": [*messages, observation] if sheet_state_changed else messages
-    })
-    thought = None
-    if response:
-        # Try to parse the thought from the planner's message if it has content
-        if hasattr(response, 'content') and response.content:
-            try:
-                thought = parse_think(response.content)
-                logger.info(f"Parsed thought: {thought[:100]}...")
-            except Exception as e:
-                # If parsing fails, continue without adding a thought
-                logger.warning(f"Failed to parse thought from planner message: {str(e)}")
+    try:
+        # LLM CALL
+        response = planner_chain.invoke({
+            "messages": [*messages, observation] if sheet_state_changed else messages
+        })
         
+        if response:
+            # Try to parse the thought from the planner's message if it has content
+            if hasattr(response, 'content') and response.content:
+                try:
+                    thought = parse_think(response.content)
+                    logger.info(f"Parsed thought: {thought[:100]}...")
+                except Exception as e:
+                    # If parsing fails, continue without adding a thought
+                    logger.warning(f"Failed to parse thought from planner message: {str(e)}")
+            
+            return {
+                **state, 
+                "messages": [observation, response] if sheet_state_changed else [response],  # Use the response directly
+                "step": state["step"] + 1
+            }
+        else:
+            logger.warning("Planner returned empty message")
+            return {
+                **state,
+                "step": state["step"] + 1  # Still increment step to prevent infinite loops
+            }
+            
+    except Exception as e:
+        logger.error(f"Error in planner node: {e}")
         return {
-            **state, 
-            "messages": [observation, response] if sheet_state_changed else [response],  # Use the response directly
-            "step": state["step"] + 1
+            **state,
+            "step": state["step"] + 1  # Increment step even on error
         }
-    else:
-        logger.warning("Planner returned empty message")
-    
-    return state
-
-def should_end(state: GraphState):
-    max_steps_reached = state["step"] >= state["max_steps"]
-    return max_steps_reached
-
-def should_preprocess(state: GraphState):
-    """Determine if OPOS preprocessing should be run."""
-    # Only run preprocessing once and if not already completed
-    return (not state.get("opos_preprocessing_complete", False) and 
-            should_run_opos_preprocessing(state))
 
 def should_validate(state: GraphState):
     """Determine if validation should be run."""
@@ -128,17 +140,41 @@ def build_graph(tools: List[BaseTool]) -> StateGraph:
     
     # Define routing function for planner
     def planner_routing(state: GraphState):
-        """Route from planner based on state."""
+        """Route from planner based on state and whether tools should be called."""
+        current_step = state.get("step", 0)
+        max_steps = state.get("max_steps", 10)
+        tool_executions = state.get("tool_executions", 0)
+        
+        # Hard limits to prevent infinite loops
+        if current_step >= max_steps:
+            logger.warning(f"Max steps ({max_steps}) reached, ending")
+            return END
+            
+        if tool_executions >= 15:  # Limit tool executions
+            logger.warning(f"Max tool executions (15) reached, moving to validation")
+            return "validation"
+            
+        # Check if validation should run (near the end)
         if should_validate(state):
             return "validation"
-        elif should_end(state):
-            return END
-        else:
+            
+        # Check if the last message has tool calls
+        last_message = state["messages"][-1] if state["messages"] else None
+        if last_message and hasattr(last_message, 'tool_calls') and last_message.tool_calls:
             return "tools"
+        else:
+            # If no tool calls, we need to decide what to do
+            # If we're early in the process, allow more attempts
+            if current_step <= 4 and tool_executions <= 8:
+                return "tools"  # Force tool execution to avoid getting stuck
+            else:
+                # Later in the process, move toward validation
+                return "validation"
     
     # Planner conditional edges
     graph.add_conditional_edges(
         "planner",
+        
         planner_routing,
         {
             "validation": "validation",
@@ -150,10 +186,15 @@ def build_graph(tools: List[BaseTool]) -> StateGraph:
     # Validation routing
     def validation_routing(state: GraphState):
         """Route from validation based on state."""
-        if should_end(state):
+        current_step = state.get("step", 0)
+        max_steps = state.get("max_steps", 10)
+        
+        # Always end after validation unless we're very early in the process
+        if current_step >= max_steps - 1:
             return END
         else:
-            return "planner"  # Go back to planner if more work needed
+            # Only go back to planner if we're early and there might be more work
+            return END  # For now, always end after validation to prevent loops
     
     graph.add_conditional_edges(
         "validation", 
@@ -164,6 +205,7 @@ def build_graph(tools: List[BaseTool]) -> StateGraph:
         }
     )
     
+    # Compile the graph with recursion limit
     graph = graph.compile()
     
     return graph
@@ -174,9 +216,9 @@ def create_initial_state(
     sandbox: Sandbox,
     planner: Runnable,
     output_dir: Path,
-    max_steps: int = 5, # ATTENTION: This determines the maximum number of steps the agent can take.
+    max_steps: int = 10, # ATTENTION: This determines the maximum number of steps the agent can take.
     prompt_manager: PromptManager = None,
-) -> GraphState:
+):
     """
     Creates the initial state for the graph execution.
     
@@ -214,8 +256,22 @@ def create_initial_state(
         # Dynamic components
         "messages": [initial_message],
         "step": 0,
+        "tool_executions": 0,
         "previous_sheet_state": sheet_state,
-        "current_sheet_state": sheet_state
+        "current_sheet_state": sheet_state,
+        
+        # OPOS Intelligence tracking (initialize with defaults)
+        "opos_preprocessing_complete": False,
+        "opos_structure_results": {},
+        "cumulative_detection_results": {},
+        "opos_guidance": "",
+        "opos_preprocessing_error": None,
+        
+        # Validation tracking (initialize with defaults)
+        "validation_complete": False,
+        "validation_issues": [],
+        "validation_warnings": [],
+        "validation_error": None,
     }
 
 
@@ -233,7 +289,7 @@ class SheetAgentGraph:
         problem: SheetProblem,
         output_dir: Path,
         sandbox: Sandbox,
-        max_steps: int = 1,
+        max_steps: int = 12,
         planner_model_name: str = MODEL_TYPE.GPT_4_1106.value,
     ):
         """
@@ -312,10 +368,11 @@ class SheetAgentGraph:
             max_steps=self.max_steps,
             prompt_manager=self.prompt_manager,
         )
+        config = RunnableConfig(recursion_limit=25)
         
         # Run the graph
         logger.info("Invoking graph")
-        final_state = self.graph.invoke(initial_state)
+        final_state = self.graph.invoke(initial_state, config)
         logger.info(f"Graph execution completed after {final_state['step']} steps")
         
         # Save the final state of the workbook

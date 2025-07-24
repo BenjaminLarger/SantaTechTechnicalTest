@@ -32,6 +32,7 @@ class GraphState(TypedDict):
     current_sheet_state: str
     previous_sheet_state: str
     step: int
+    tool_executions: Optional[int]  # Track number of tool executions to prevent infinite loops
     
     # OPOS Intelligence tracking (optional fields)
     opos_preprocessing_complete: Optional[bool]

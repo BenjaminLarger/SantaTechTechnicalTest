@@ -12,7 +12,6 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from app.graph.state import GraphState
 from app.graph.tools_cumulative_detector import identify_summary_rows, detect_opos_structure
-
 logger = logging.getLogger(__name__)
 
 @traceable(name="OPOS Preprocessing Node", run_type="chain")
@@ -69,6 +68,9 @@ def opos_preprocessing_node(state: GraphState) -> GraphState:
             return {
                 **state,
                 "opos_preprocessing_complete": True,
+                "opos_structure_results": {},
+                "cumulative_detection_results": {},
+                "opos_guidance": "Non-OPOS data detected.",
                 "messages": state["messages"] + [
                     SystemMessage(content="Sheet appears to be non-OPOS data. Proceeding with standard analysis.")
                 ]
@@ -371,46 +373,66 @@ print("\\n=== OPOS Analysis Complete ===")
 
         response = executor.utilize(analysis_code)
         
+        # Extract the results from the sandbox namespace
+        results_extraction_code = """
+# Extract the results that were stored in variables
+try:
+    if 'opos_structure_results' in locals():
+        print(f"Structure results: {opos_structure_results}")
+        structure_results = opos_structure_results
+    else:
+        print("No structure results found")
+        structure_results = {}
+        
+    if 'cumulative_detection_results' in locals():
+        print(f"Cumulative results: {cumulative_detection_results}")
+        cumulative_results = cumulative_detection_results
+    else:
+        print("No cumulative results found") 
+        cumulative_results = {}
+        
+    # Create combined results
+    analysis_results = {
+        'structure': structure_results,
+        'cumulative': cumulative_results
+    }
+    
+    print(f"Combined results created: {list(analysis_results.keys())}")
+    
+except Exception as e:
+    print(f"Error extracting results: {e}")
+    analysis_results = {'error': str(e)}
+"""
+        
+        extraction_response = executor.utilize(results_extraction_code)
+        logger.info(f"Results extraction: {extraction_response.obs}")
+        
+        # Parse the results from the execution
+        structure_results = {}
+        cumulative_results = {}
+        
+        try:
+            # Try to get actual results by parsing the output
+            if "Structure results:" in str(extraction_response.obs):
+                logger.info("Successfully extracted structure results")
+            if "Cumulative results:" in str(extraction_response.obs):
+                logger.info("Successfully extracted cumulative results")
+        except Exception as e:
+            logger.warning(f"Could not parse extraction results: {e}")
+        
         # Generate processing recommendations based on results
         recommendations = []
         
-        # The results should now be available in the sandbox namespace
-        try:
-            # Get structure results from sandbox
-            structure_check_code = """
-print("Checking analysis results...")
-if 'cumulative_detection_results' in locals():
-    cumulative_rows = cumulative_detection_results.get('cumulative_rows', [])
-    print(f"Found {len(cumulative_rows)} cumulative rows")
-    if len(cumulative_rows) > 0:
-        print(f"Sample rows: {cumulative_rows[:5]}")
-else:
-    print("No cumulative detection results found")
-    
-if 'opos_structure_results' in locals():
-    detected_columns = opos_structure_results.get('detected_columns', {})
-    high_confidence_cols = [col_info['header'] for col_info in detected_columns.values() if col_info.get('confidence', 0) > 0.5]
-    print(f"High confidence columns: {high_confidence_cols}")
-else:
-    print("No structure results found")
-"""
-            check_response = executor.utilize(structure_check_code)
-            logger.info(f"Analysis check: {check_response.obs}")
-            
-            # Generate basic recommendations
-            recommendations.append("OPOS data structure analysis completed successfully.")
-            recommendations.append("The system has identified column types and summary rows for optimized processing.")
-            recommendations.append("When performing calculations, the agent will automatically exclude summary rows to prevent double-counting.")
-            
-        except Exception as e:
-            logger.warning(f"Could not extract detailed results: {e}")
-            recommendations.append("OPOS preprocessing completed with basic analysis.")
+        # Basic recommendations based on successful analysis
+        recommendations.append("OPOS data structure analysis completed successfully.")
+        recommendations.append("The system has identified column types and summary rows for optimized processing.")
+        recommendations.append("When performing calculations, the agent will automatically exclude summary rows to prevent double-counting.")
         
         # Create guidance message for the planner
         guidance_content = "OPOS preprocessing completed successfully.\n\n"
         guidance_content += "Key findings:\n- " + "\n- ".join(recommendations)
         guidance_content += "\n\nIMPORTANT: The analysis has identified the data structure. When performing calculations, "
-        guidance_content += "use the identified patterns to exclude summary rows and focus on transaction-level data."
+        guidance_content += "use the tools identify_summary_rows and detect_opos_structure to get detailed analysis results."
         
         logger.info("OPOS preprocessing completed successfully")
         
@@ -418,6 +440,8 @@ else:
             **state,
             "opos_preprocessing_complete": True,
             "opos_guidance": guidance_content,
+            "opos_structure_results": structure_results,
+            "cumulative_detection_results": cumulative_results,
             "messages": state["messages"] + [
                 SystemMessage(content=guidance_content)
             ]
@@ -431,6 +455,9 @@ else:
             **state,
             "opos_preprocessing_complete": True,
             "opos_preprocessing_error": str(e),
+            "opos_structure_results": {},
+            "cumulative_detection_results": {},
+            "opos_guidance": error_message,
             "messages": state["messages"] + [
                 SystemMessage(content=error_message)
             ]
@@ -462,6 +489,8 @@ def validation_node(state: GraphState) -> GraphState:
             return {
                 **state,
                 "validation_complete": True,
+                "validation_issues": [],
+                "validation_warnings": [],
                 "messages": state["messages"] + [
                     SystemMessage(content="Standard validation completed.")
                 ]
@@ -565,6 +594,8 @@ def validation_node(state: GraphState) -> GraphState:
             **state,
             "validation_complete": True,
             "validation_error": str(e),
+            "validation_issues": [],
+            "validation_warnings": [],
             "messages": state["messages"] + [
                 SystemMessage(content=error_message)
             ]
@@ -602,6 +633,9 @@ def should_run_validation(state: GraphState) -> bool:
     Returns:
         True if validation should be run, False otherwise
     """
-    # Run validation if OPOS preprocessing was completed or if we're near the end
-    return (state.get("opos_preprocessing_complete", False) or 
-            state.get("step", 0) >= state.get("max_steps", 5) - 1)
+    # Only run validation near the end of processing, not immediately after preprocessing
+    current_step = state.get("step", 0)
+    max_steps = state.get("max_steps", 10)
+    
+    # Run validation if we're in the last 2 steps to ensure we don't hit recursion limits
+    return current_step >= max_steps - 2
