@@ -20,6 +20,7 @@ from app.dataset.dataloader import SheetProblem
 from app.core.sandbox import Sandbox
 from app.graph.tools import python_executor, cell_range_reader
 from app.graph.opos_intelligence import get_all_intelligence_tools
+from app.graph.nodes.opos_analyzer import opos_preprocessing_node, validation_node, should_run_opos_preprocessing, should_run_validation
 from app.core.prompt_manager import PromptManager
 from app.utils.utils import parse_think
 from app.graph.state import GraphState
@@ -81,6 +82,17 @@ def should_end(state: GraphState):
     max_steps_reached = state["step"] >= state["max_steps"]
     return max_steps_reached
 
+def should_preprocess(state: GraphState):
+    """Determine if OPOS preprocessing should be run."""
+    # Only run preprocessing once and if not already completed
+    return (not state.get("opos_preprocessing_complete", False) and 
+            should_run_opos_preprocessing(state))
+
+def should_validate(state: GraphState):
+    """Determine if validation should be run."""
+    # Run validation near the end or if explicitly needed
+    return should_run_validation(state)
+
 def build_graph(tools: List[BaseTool]) -> StateGraph:
     """
     Builds and returns the StateGraph for the agent workflow.
@@ -88,6 +100,8 @@ def build_graph(tools: List[BaseTool]) -> StateGraph:
     This function constructs the StateGraph with the appropriate nodes and edges
     based on the refactoring plan. It defines the control flow between the nodes
     and compiles the graph into a runnable.
+    
+    Enhanced with OPOS intelligence nodes for better financial data processing.
     
     Args:
         tools: List of tools to be used by the ToolNode.
@@ -97,21 +111,58 @@ def build_graph(tools: List[BaseTool]) -> StateGraph:
     """
     graph = StateGraph(GraphState)
     
+    # Add all nodes
+    graph.add_node("opos_preprocessing", opos_preprocessing_node)
     graph.add_node("planner", planner_node)
     graph.add_node("tools", ToolNode(tools))
-    # Always go back to planner after tools are called
-    graph.add_edge("tools", "planner") 
+    graph.add_node("validation", validation_node)
     
+    # Set entry point - start with OPOS preprocessing
+    graph.set_entry_point("opos_preprocessing")
+    
+    # Flow from preprocessing to planner
+    graph.add_edge("opos_preprocessing", "planner")
+    
+    # Tools always go back to planner
+    graph.add_edge("tools", "planner")
+    
+    # Define routing function for planner
+    def planner_routing(state: GraphState):
+        """Route from planner based on state."""
+        if should_validate(state):
+            return "validation"
+        elif should_end(state):
+            return END
+        else:
+            return "tools"
+    
+    # Planner conditional edges
     graph.add_conditional_edges(
         "planner",
-        should_end,
+        planner_routing,
         {
-            True: END,
-            False: "tools"
+            "validation": "validation",
+            "tools": "tools", 
+            END: END
         }
     )
-
-    graph.set_entry_point("planner")    
+    
+    # Validation routing
+    def validation_routing(state: GraphState):
+        """Route from validation based on state."""
+        if should_end(state):
+            return END
+        else:
+            return "planner"  # Go back to planner if more work needed
+    
+    graph.add_conditional_edges(
+        "validation", 
+        validation_routing,
+        {
+            "planner": "planner",
+            END: END
+        }
+    )
     
     graph = graph.compile()
     

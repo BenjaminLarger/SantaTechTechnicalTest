@@ -1,4 +1,4 @@
-from typing import Annotated, List
+from typing import Annotated, List, Dict, Any, Optional
 from typing_extensions import TypedDict
 from pathlib import Path
 
@@ -16,6 +16,7 @@ class GraphState(TypedDict):
     
     This class represents the state that is passed between nodes in the graph.
     It contains all the necessary information for the workflow to execute.
+    Enhanced with OPOS intelligence tracking.
     """
     # Static components that don't change during execution
     problem: SheetProblem
@@ -31,3 +32,16 @@ class GraphState(TypedDict):
     current_sheet_state: str
     previous_sheet_state: str
     step: int
+    
+    # OPOS Intelligence tracking (optional fields)
+    opos_preprocessing_complete: Optional[bool]
+    opos_structure_results: Optional[Dict[str, Any]]
+    cumulative_detection_results: Optional[Dict[str, Any]]
+    opos_guidance: Optional[str]
+    opos_preprocessing_error: Optional[str]
+    
+    # Validation tracking (optional fields)
+    validation_complete: Optional[bool]
+    validation_issues: Optional[List[str]]
+    validation_warnings: Optional[List[str]]
+    validation_error: Optional[str]
