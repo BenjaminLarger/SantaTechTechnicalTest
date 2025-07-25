@@ -11,7 +11,7 @@ import logging
 from langchain_core.tools import BaseTool
 from langchain_core.runnables import Runnable
 from langgraph.graph import StateGraph, END
-from langgraph.prebuilt import ToolNode, tools_condition
+from langgraph.prebuilt import ToolNode
 from langchain_openai import ChatOpenAI
 from langsmith import traceable
 
@@ -20,7 +20,7 @@ from app.dataset.dataloader import SheetProblem
 from app.core.sandbox import Sandbox
 from app.graph.tools import python_executor, cell_range_reader
 from app.graph.opos_intelligence import get_all_intelligence_tools
-from app.graph.nodes.opos_analyzer import opos_preprocessing_node, validation_node, should_run_opos_preprocessing, should_run_validation
+from app.graph.nodes.opos_analyzer import opos_preprocessing_node, validation_node, should_run_validation
 from app.core.prompt_manager import PromptManager
 from app.utils.utils import parse_think
 from app.graph.state import GraphState
@@ -142,16 +142,16 @@ def build_graph(tools: List[BaseTool]) -> StateGraph:
     def planner_routing(state: GraphState):
         """Route from planner based on state and whether tools should be called."""
         current_step = state.get("step", 0)
-        max_steps = state.get("max_steps", 10)
-        tool_executions = state.get("tool_executions", 0)
+        max_steps = state.get("max_steps", 8)  # Reduced from 10 due to streamlined tools
+        tool_executions = state.get("tool_executions", 0) # Track number of tool executions
         
         # Hard limits to prevent infinite loops
         if current_step >= max_steps:
             logger.warning(f"Max steps ({max_steps}) reached, ending")
             return END
             
-        if tool_executions >= 15:  # Limit tool executions
-            logger.warning(f"Max tool executions (15) reached, moving to validation")
+        if tool_executions >= 10:  # Reduced from 15 due to fewer tools available
+            logger.warning(f"Max tool executions (10) reached, moving to validation")
             return "validation"
             
         # Check if validation should run (near the end)
@@ -165,13 +165,13 @@ def build_graph(tools: List[BaseTool]) -> StateGraph:
         else:
             # If no tool calls, we need to decide what to do
             # If we're early in the process, allow more attempts
-            if current_step <= 4 and tool_executions <= 8:
+            if current_step <= 3 and tool_executions <= 6:  # Adjusted thresholds for streamlined workflow
                 return "tools"  # Force tool execution to avoid getting stuck
             else:
                 # Later in the process, move toward validation
                 return "validation"
     
-    # Planner conditional edges
+    # Planner conditional edges that choose next steps based on routing
     graph.add_conditional_edges(
         "planner",
         
@@ -187,7 +187,7 @@ def build_graph(tools: List[BaseTool]) -> StateGraph:
     def validation_routing(state: GraphState):
         """Route from validation based on state."""
         current_step = state.get("step", 0)
-        max_steps = state.get("max_steps", 10)
+        max_steps = state.get("max_steps", 8)  # Updated to match planner routing
         
         # Always end after validation unless we're very early in the process
         if current_step >= max_steps - 1:
@@ -216,7 +216,7 @@ def create_initial_state(
     sandbox: Sandbox,
     planner: Runnable,
     output_dir: Path,
-    max_steps: int = 10, # ATTENTION: This determines the maximum number of steps the agent can take.
+    max_steps: int = 8, # ATTENTION: Reduced from 10 due to streamlined tool suite - determines the maximum number of steps the agent can take.
     prompt_manager: PromptManager = None,
 ):
     """
@@ -289,7 +289,7 @@ class SheetAgentGraph:
         problem: SheetProblem,
         output_dir: Path,
         sandbox: Sandbox,
-        max_steps: int = 12,
+        max_steps: int = 10,  # Reduced from 12 due to streamlined workflow
         planner_model_name: str = MODEL_TYPE.GPT_4_1106.value,
     ):
         """
@@ -324,9 +324,10 @@ class SheetAgentGraph:
         )
         
         # Create list of tools for binding (enhanced with OPOS intelligence)
-        base_tools = [python_executor, cell_range_reader]
-        intelligence_tools = get_all_intelligence_tools()
-        self.tool_list = base_tools + intelligence_tools
+        # base_tools = [python_executor, cell_range_reader]
+        # intelligence_tools = get_all_intelligence_tools()
+        # self.tool_list = base_tools + intelligence_tools
+        self.tool_list = [python_executor, cell_range_reader]
         
         logger.info(f"Initialized SheetAgent with {len(self.tool_list)} tools: {[tool.name for tool in self.tool_list]}")
         

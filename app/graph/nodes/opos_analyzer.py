@@ -5,10 +5,9 @@ This module provides specialized nodes for OPOS data preprocessing and validatio
 to enhance the efficiency and accuracy of financial data analysis.
 """
 import logging
-from typing import Dict, Any, List
 
 from langsmith import traceable
-from langchain_core.messages import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage
 
 from app.graph.state import GraphState
 from app.graph.tools_cumulative_detector import identify_summary_rows, detect_opos_structure
@@ -432,7 +431,7 @@ except Exception as e:
         guidance_content = "OPOS preprocessing completed successfully.\n\n"
         guidance_content += "Key findings:\n- " + "\n- ".join(recommendations)
         guidance_content += "\n\nIMPORTANT: The analysis has identified the data structure. When performing calculations, "
-        guidance_content += "use the tools identify_summary_rows and detect_opos_structure to get detailed analysis results."
+        # guidance_content += "use the tools identify_summary_rows and detect_opos_structure to get detailed analysis results."
         
         logger.info("OPOS preprocessing completed successfully")
         
@@ -542,6 +541,11 @@ def validation_node(state: GraphState) -> GraphState:
         
         if has_calculation_activity and cumulative_detection.get("cumulative_rows"):
             # Check if the calculation messages mention excluding summary rows
+            # Quality Assurance, this validation ensures the AI agent:
+            # - Recognizes that summary rows exist
+            # - Acknowledges the need to exclude them
+            # - Prevents financial calculation errors
+            # - Maintains data integrity in OPOS analysis
             mentions_exclusion = any(
                 "exclude" in msg.content.lower() or "skip" in msg.content.lower() or
                 "summary" in msg.content.lower() or "debitor" in msg.content.lower()
@@ -600,27 +604,6 @@ def validation_node(state: GraphState) -> GraphState:
                 SystemMessage(content=error_message)
             ]
         }
-
-# Helper function to determine if OPOS preprocessing should be triggered
-def should_run_opos_preprocessing(state: GraphState) -> bool:
-    """
-    Determine if OPOS preprocessing should be run based on sheet content.
-    
-    Args:
-        state: Current graph state
-        
-    Returns:
-        True if OPOS preprocessing should be run, False otherwise
-    """
-    sheet_state = state.get("current_sheet_state", "")
-    
-    # Look for OPOS indicators in sheet state
-    opos_indicators = [
-        "debitor", "buchung", "beleg", "währung", "betrag", 
-        "invoice", "amount", "due", "fällig", "rechnungsdatum"
-    ]
-    
-    return any(indicator.lower() in sheet_state.lower() for indicator in opos_indicators)
 
 # Helper function to check if validation should be run
 def should_run_validation(state: GraphState) -> bool:
