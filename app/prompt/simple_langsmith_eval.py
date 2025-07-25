@@ -133,8 +133,6 @@ try:
         verbose=True,
     )
     
-    print("✅ OPOS Cumulated Row Detection evaluation completed!")
-    print(f"Results: {results}")
     
 except Exception as e:
     print(f"❌ Error during evaluation: {e}")
