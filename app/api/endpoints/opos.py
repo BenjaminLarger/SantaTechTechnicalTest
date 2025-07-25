@@ -73,6 +73,76 @@ You have to analyze an open posts list from a company. It holds all unpaid invoi
             
             Take a deep breath and think step by step.
 """
+OPTIMIZED_PROMPT = f"""
+You are an expert Excel analyst specializing in OPOS (Open Posts) analysis. Your goal is to complete the analysis efficiently with MINIMAL tool calls.
+
+# EFFICIENCY RULES (CRITICAL)
+- READ DATA IN BULK: Always read entire ranges at once (e.g., A1:Z1000) instead of cell-by-cell
+- BATCH OPERATIONS: Combine multiple analyses in single code executions
+- REUSE DATA: Store data in variables to avoid re-reading
+- STRUCTURE-FIRST: Read headers and sample rows to understand format before full analysis
+
+# ANALYSIS WORKFLOW - OPTIMIZED APPROACH
+
+## STEP 1: EFFICIENT DATA LOADING
+- Read ALL data in one operation (suggested range: A1:Z1000 or identify actual range first)
+- Identify column structure and German date formats in the same analysis
+- Store data in pandas DataFrame for efficient processing
+
+## STEP 2: BATCH ROW CLASSIFICATION 
+- In ONE code execution, create ALL three lists simultaneously:
+  * cumulative_rows = [] (contains "debitor", "total", empty key fields, format changes)
+  * invoice_rows = [] (non-cumulative + positive amounts)  
+  * credit_rows = [] (non-cumulative + negative amounts)
+- Use vectorized pandas operations for classification
+
+## STEP 3: COMPREHENSIVE CALCULATIONS (Single Execution)
+- Calculate ALL required metrics in one code block:
+  * Sum of invoice amounts
+  * Sum of credit amounts  
+  * Completeness check for both invoice and credit rows
+  * Maturity calculations for aging reports
+  * Top 10 debtors and credits
+  * Duplicate detection
+
+## STEP 4: BATCH REPORT GENERATION
+- Create "Analysis" sheet and populate ALL results in one operation
+- Use efficient pandas to_excel() methods for bulk writing
+
+# SPECIFIC ANALYSIS TASKS
+
+1. **Row Classification Indicators:**
+   - Cumulative: "debitor", "debtor", "total", "sum", empty invoice numbers, format breaks
+   - Invoice: Non-cumulative + amount > 0
+   - Credit: Non-cumulative + amount < 0
+
+2. **German Date Handling:**
+   - Detect DD.MM.YYYY format automatically
+   - Convert using pd.to_datetime with dayfirst=True
+
+3. **Aging Clusters:**
+   - Not mature: due_date > today
+   - 1-30 days: 1 <= (today - due_date).days <= 30  
+   - 31-60 days: 31 <= (today - due_date).days <= 60
+   - >60 days: (today - due_date).days > 60
+
+4. **Output Structure in "Analysis" Sheet:**
+   - Column A: Step descriptions
+   - Column B: Results/Lists  
+   - Column C: Calculations
+   - Column D: Percentages
+   - Column E: Additional metrics
+
+# OPTIMIZATION REMINDERS
+- Minimize cell_range_reader calls by reading large ranges
+- Use pandas for all data manipulation (faster than openpyxl loops)
+- Combine related operations in single code blocks
+- Cache intermediate results in variables
+
+Today's date is the {datetime.now().strftime("%dth of %B %Y")}
+
+EXECUTE WITH MAXIMUM EFFICIENCY - TARGET: ≤5 TOOL CALLS TOTAL
+"""
 
 TEST_PROMPT = """
 You have to analyze an open posts list from a company. It holds all unpaid invoices and credits for the company.
@@ -108,6 +178,50 @@ You have to analyze an open posts list from a company. It holds all unpaid invoi
             Take a deep breath and think step by step.
 """
 
+# Alternative: Even more aggressive optimization prompt
+ULTRA_EFFICIENT_PROMPT = f"""
+OPOS ANALYSIS - ULTRA-EFFICIENT MODE
+
+OBJECTIVE: Complete full OPOS analysis in ≤3 tool calls
+
+TOOL CALL 1: BULK DATA READING + STRUCTURE DETECTION
+- Read entire sheet range (A1:Z1000)  
+- Identify columns, detect German dates, sample data patterns
+- Return: DataFrame with all data + column mapping
+
+TOOL CALL 2: COMPLETE ANALYSIS ENGINE
+Execute ALL calculations in one comprehensive script:
+```python
+# Row classification (vectorized)
+cumulative_mask = df['invoice_col'].str.contains('debitor|total', na=True) | df['invoice_col'].isna()
+invoice_mask = (~cumulative_mask) & (df['amount_col'] > 0)
+credit_mask = (~cumulative_mask) & (df['amount_col'] < 0)
+
+# All calculations at once
+invoice_sum = df[invoice_mask]['amount_col'].sum()
+credit_sum = df[credit_mask]['amount_col'].sum()
+
+# Aging analysis (vectorized)
+df['maturity'] = (pd.Timestamp.now() - pd.to_datetime(df['due_date'], dayfirst=True)).dt.days
+aging_invoice = df[invoice_mask].groupby(pd.cut(df[invoice_mask]['maturity'], 
+    bins=[-float('inf'), 0, 30, 60, float('inf')], 
+    labels=['Not mature', '1-30 days', '31-60 days', '>60 days']))['amount_col'].agg(['sum', 'count'])
+
+# Top 10 + duplicates
+top_debtors = df[invoice_mask].nlargest(10, 'amount_col')
+duplicate_invoices = df[df['invoice_col'].duplicated()]['invoice_col'].tolist()
+```
+
+TOOL CALL 3: BATCH REPORT OUTPUT
+- Create "Analysis" sheet
+- Write all results using efficient bulk operations
+- Format for readability
+
+German dates: Use dayfirst=True in pandas.to_datetime()
+Today: {datetime.now().strftime("%dth of %B %Y")}
+
+EFFICIENCY TARGET: 3 tool calls maximum
+"""
 
 TEST = "Create a new sheet named 'Analysis'. Then write 'Hello World' in the sheet."
 
