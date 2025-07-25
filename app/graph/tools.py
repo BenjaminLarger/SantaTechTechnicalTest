@@ -85,23 +85,25 @@ def cell_range_reader(
     sandbox = state["sandbox"]
     executor = PythonInterpreter(sandbox)
     code = f"""
-sheet = workbook["{sheet_name}"]
-rows = sheet["{cell_range}"]
-if len(rows) == 0:
-    print("Error: The cell range is empty. Please provide a valid cell range.")
-    return
-
-if len(rows) > 10:
-    print("Error: The cell range is too large. Please provide a cell range with a maximum of 10 rows and 10 columns.")
-    return
-
-if len(rows[0]) > 10:
-    print("Error: The cell range is too large. Please provide a cell range with a maximum of 10 rows and 10 columns.")
-    return
-
-for row in sheet["{cell_range}"]:
-    for cell in row:
-        print(cell.row, cell.column, cell.value)
+try:
+    sheet = workbook["{sheet_name}"]
+    rows = sheet["{cell_range}"]
+    
+    # Check if the cell range is empty
+    if len(rows) == 0:
+        print("Error: The cell range is empty. Please provide a valid cell range.")
+    elif len(rows) > 10:
+        print("Error: The cell range is too large. Please provide a cell range with a maximum of 10 rows and 10 columns.")
+    elif len(rows[0]) > 10:
+        print("Error: The cell range is too large. Please provide a cell range with a maximum of 10 rows and 10 columns.")
+    else:
+        # Print the cell data
+        for row in sheet["{cell_range}"]:
+            for cell in row:
+                print(cell.row, cell.column, cell.value)
+                
+except Exception as e:
+    print(f"Error reading cell range: {{e}}")
 """
 
     response = executor.utilize(code)
